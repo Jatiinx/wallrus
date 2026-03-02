@@ -53,8 +53,10 @@ void main() {
     float w1 = duneWave(x, 0.55, freq1, p1, 0.08, lfo1);
     float w2 = duneWave(x, 0.80, freq2, p2, 0.07, lfo2);
 
-    // Thin edge to preserve sine shape faithfully
-    float edge = 0.005;
+    // Edge width for wave boundary transitions.
+    // Controls how wide the blend zone is at each wave crest.
+    // Scaled by uBlend so blend=0 gives sharp edges, blend=1 gives soft transitions.
+    float edge = 0.005 + uBlend * 0.08;
 
     // Silhouette masks: 1.0 when y < wave (pixel below wave on screen)
     float below0 = smoothstep(w0 + edge, w0 - edge, y);
@@ -62,30 +64,10 @@ void main() {
     float below2 = smoothstep(w2 + edge, w2 - edge, y);
 
     // Painter's algorithm: draw back-to-front.
-    // Check foreground (w0) first — it always paints over everything behind it.
-    // Color 4 (t~0.75-1.0)  = bottom/foreground dune (below w0)
-    // Color 3 (t~0.50-0.75) = middle dune (below w1)
-    // Color 2 (t~0.25-0.50) = top/back dune (below w2)
-    // Color 1 (t<0.25)      = background/sky
-    float t;
-    if (below0 > 0.5) {
-        // Below wave 0: foreground dune (color 4) — always on top
-        float localT = smoothstep(w0, w0 - 0.30, y);
-        t = mix(0.75, 1.0, localT);
-    } else if (below1 > 0.5) {
-        // Below wave 1: middle dune (color 3)
-        float localT = smoothstep(w1, w1 - 0.30, y);
-        t = mix(0.50, 0.75, localT);
-    } else if (below2 > 0.5) {
-        // Below wave 2: back dune (color 2)
-        float localT = smoothstep(w2, w2 - 0.30, y);
-        t = mix(0.25, 0.50, localT);
-    } else {
-        // Above all waves: background (color 1)
-        // Fade from background to top dune as y approaches w2 from above
-        float localT = smoothstep(w2 + 0.30, w2, y);
-        t = mix(0.0, 0.25, localT);
-    }
+    // Mix between band centers at wave edges — below masks control transitions.
+    float t = mix(0.125, 0.375, below2);  // background -> back dune
+    t = mix(t, 0.625, below1);            // ... -> middle dune
+    t = mix(t, 0.875, below0);            // ... -> foreground dune
 
     vec3 color = paletteColor(t);
     color = applyLighting(color, t, uv);
