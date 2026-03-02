@@ -33,20 +33,20 @@ void main() {
     // is unused so the slider "clicks" between distinct configurations.
     float seed = floor(uVariation * 10.0) * 0.1;
 
-    // Per-layer random frequencies (range ~1.0 to 3.0)
-    float freq0 = 1.0 + hash1(seed + 0.1) * 2.0;
-    float freq1 = 1.0 + hash1(seed + 0.2) * 2.0;
-    float freq2 = 1.0 + hash1(seed + 0.3) * 2.0;
+    // Per-layer random frequencies (range ~0.5 to 3.0)
+    float freq0 = 0.5 + hash1(seed + 0.1) * 2.5;
+    float freq1 = 0.5 + hash1(seed + 0.2) * 2.5;
+    float freq2 = 0.5 + hash1(seed + 0.3) * 2.5;
 
     // Per-layer random phases (range 0 to 2*PI)
     float p0 = hash1(seed + 0.4) * 6.2832;
     float p1 = hash1(seed + 0.5) * 6.2832;
     float p2 = hash1(seed + 0.6) * 6.2832;
 
-    // Per-layer random LFO frequencies (~1/6th to 1/3rd of main freq)
-    float lfo0 = freq0 * (0.15 + hash1(seed + 0.7) * 0.2);
-    float lfo1 = freq1 * (0.15 + hash1(seed + 0.8) * 0.2);
-    float lfo2 = freq2 * (0.15 + hash1(seed + 0.9) * 0.2);
+    // Per-layer random LFO frequencies (~1/20th to 1/4th of main freq)
+    float lfo0 = freq0 * (0.05 + hash1(seed + 0.7) * 0.2);
+    float lfo1 = freq1 * (0.05 + hash1(seed + 0.8) * 0.2);
+    float lfo2 = freq2 * (0.05 + hash1(seed + 0.9) * 0.2);
 
     // 3 dune waves: color1 is background, colors 2-4 are the dune layers
     float w0 = duneWave(x, 0.30, freq0, p0, 0.07, lfo0);
@@ -61,30 +61,30 @@ void main() {
     float below1 = smoothstep(w1 + edge, w1 - edge, y);
     float below2 = smoothstep(w2 + edge, w2 - edge, y);
 
-    // Determine which band the pixel is in.
-    // Color 1 (t<0.25) = background/sky above all waves
-    // Color 2 (t~0.25-0.50) = top dune (between w2 and w1)
-    // Color 3 (t~0.50-0.75) = middle dune (between w1 and w0)
+    // Painter's algorithm: draw back-to-front.
+    // Check foreground (w0) first — it always paints over everything behind it.
     // Color 4 (t~0.75-1.0)  = bottom/foreground dune (below w0)
+    // Color 3 (t~0.50-0.75) = middle dune (below w1)
+    // Color 2 (t~0.25-0.50) = top/back dune (below w2)
+    // Color 1 (t<0.25)      = background/sky
     float t;
-    if (below2 < 0.5) {
-        // Fade from background (color 1) to top dune (color 2) as y approaches w2 from above
-        float localT = smoothstep(w2 + 0.30, w2, y);
-        t = mix(0.0, 0.25, localT);
-    } else if (below1 < 0.5) {
-        // Between wave 2 (top) and wave 1: color 2
-        float localT = (w2 - y) / max(w2 - w1, 0.001);
-        localT = clamp(localT, 0.0, 1.0);
-        t = mix(0.25, 0.50, localT);
-    } else if (below0 < 0.5) {
-        // Between wave 1 and wave 0: color 3
-        float localT = (w1 - y) / max(w1 - w0, 0.001);
-        localT = clamp(localT, 0.0, 1.0);
-        t = mix(0.50, 0.75, localT);
-    } else {
-        // Below wave 0: foreground (color 4)
+    if (below0 > 0.5) {
+        // Below wave 0: foreground dune (color 4) — always on top
         float localT = smoothstep(w0, w0 - 0.30, y);
         t = mix(0.75, 1.0, localT);
+    } else if (below1 > 0.5) {
+        // Below wave 1: middle dune (color 3)
+        float localT = smoothstep(w1, w1 - 0.30, y);
+        t = mix(0.50, 0.75, localT);
+    } else if (below2 > 0.5) {
+        // Below wave 2: back dune (color 2)
+        float localT = smoothstep(w2, w2 - 0.30, y);
+        t = mix(0.25, 0.50, localT);
+    } else {
+        // Above all waves: background (color 1)
+        // Fade from background to top dune as y approaches w2 from above
+        float localT = smoothstep(w2 + 0.30, w2, y);
+        t = mix(0.0, 0.25, localT);
     }
 
     vec3 color = paletteColor(t);
