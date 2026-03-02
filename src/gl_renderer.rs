@@ -81,6 +81,8 @@ pub struct RendererState {
     pub noise: f32,
     pub center: f32,
     pub dither: f32,
+    pub dither_strength: f32,
+    pub dither_levels: f32,
     pub variation: f32,
     // Shader uniforms — lighting
     pub lighting_type: i32,
@@ -103,6 +105,7 @@ pub struct RendererState {
     blur_program: Option<ShaderProgram>,
     bloom_program: Option<ShaderProgram>,
     chromatic_program: Option<ShaderProgram>,
+    effects_program: Option<ShaderProgram>,
     // Ping-pong FBO pair for multi-pass post-processing
     pp_fbos: [glow::Framebuffer; 2],
     pp_textures: [glow::Texture; 2],
@@ -212,6 +215,8 @@ impl RendererState {
             "chromatic",
             &shader_presets::chromatic_fragment_source(),
         );
+        let effects_program =
+            compile_pp_shader(&gl, "effects", &shader_presets::effects_fragment_source());
 
         Self {
             gl,
@@ -232,6 +237,8 @@ impl RendererState {
             noise: 0.0,
             center: 0.0,
             dither: 0.0,
+            dither_strength: 0.5,
+            dither_levels: 4.0,
             variation: 0.0,
             lighting_type: 0,
             light_strength: 0.0,
@@ -249,6 +256,7 @@ impl RendererState {
             blur_program,
             bloom_program,
             chromatic_program,
+            effects_program,
             pp_fbos: [fbo_a, fbo_b],
             pp_textures: [tex_a, tex_b],
             pp_fbo_size: (1, 1),
@@ -304,7 +312,11 @@ impl RendererState {
 
     /// Returns true if any post-processing effect is active.
     fn has_active_postprocess(&self) -> bool {
-        self.blur_type != 0 || self.bloom_enabled || self.chromatic_enabled
+        self.blur_type != 0
+            || self.bloom_enabled
+            || self.chromatic_enabled
+            || self.noise != 0.0
+            || self.dither > 0.5
     }
 
     /// Render the pattern shader (single pass) into the currently bound FBO.
@@ -357,14 +369,8 @@ impl RendererState {
                 if let Some(loc) = gl.get_uniform_location(program.id, "uDistortStrength") {
                     gl.uniform_1_f32(Some(&loc), self.distort_strength);
                 }
-                if let Some(loc) = gl.get_uniform_location(program.id, "uNoise") {
-                    gl.uniform_1_f32(Some(&loc), self.noise);
-                }
                 if let Some(loc) = gl.get_uniform_location(program.id, "uCenter") {
                     gl.uniform_1_f32(Some(&loc), self.center);
-                }
-                if let Some(loc) = gl.get_uniform_location(program.id, "uDither") {
-                    gl.uniform_1_f32(Some(&loc), self.dither);
                 }
                 if let Some(loc) = gl.get_uniform_location(program.id, "uVariation") {
                     gl.uniform_1_f32(Some(&loc), self.variation);
@@ -456,9 +462,10 @@ impl RendererState {
             Blur,
             Bloom,
             Chromatic,
+            Effects,
         }
 
-        let mut passes: Vec<PpPass> = Vec::with_capacity(3);
+        let mut passes: Vec<PpPass> = Vec::with_capacity(4);
         if self.blur_type != 0 && self.blur_program.is_some() {
             passes.push(PpPass::Blur);
         }
@@ -467,6 +474,9 @@ impl RendererState {
         }
         if self.chromatic_enabled && self.chromatic_program.is_some() {
             passes.push(PpPass::Chromatic);
+        }
+        if (self.noise != 0.0 || self.dither > 0.5) && self.effects_program.is_some() {
+            passes.push(PpPass::Effects);
         }
 
         // Render scene into pp_fbos[0] (texture A).
@@ -563,6 +573,32 @@ impl RendererState {
                             }
                             if let Some(loc) = gl.get_uniform_location(prog, "uChromaticAngle") {
                                 gl.uniform_1_f32(Some(&loc), angle);
+                            }
+                        },
+                    );
+                }
+                PpPass::Effects => {
+                    let noise = self.noise;
+                    let dither = self.dither;
+                    let dither_strength = self.dither_strength;
+                    let dither_levels = self.dither_levels;
+                    self.run_pp_pass(
+                        self.effects_program.as_ref().unwrap(),
+                        src_texture,
+                        width,
+                        height,
+                        |gl, prog| unsafe {
+                            if let Some(loc) = gl.get_uniform_location(prog, "uNoise") {
+                                gl.uniform_1_f32(Some(&loc), noise);
+                            }
+                            if let Some(loc) = gl.get_uniform_location(prog, "uDither") {
+                                gl.uniform_1_f32(Some(&loc), dither);
+                            }
+                            if let Some(loc) = gl.get_uniform_location(prog, "uDitherStrength") {
+                                gl.uniform_1_f32(Some(&loc), dither_strength);
+                            }
+                            if let Some(loc) = gl.get_uniform_location(prog, "uDitherLevels") {
+                                gl.uniform_1_f32(Some(&loc), dither_levels);
                             }
                         },
                     );
@@ -678,6 +714,9 @@ impl Drop for RendererState {
                 self.gl.delete_program(prog.id);
             }
             if let Some(prog) = self.chromatic_program.take() {
+                self.gl.delete_program(prog.id);
+            }
+            if let Some(prog) = self.effects_program.take() {
                 self.gl.delete_program(prog.id);
             }
             // Clean up ping-pong FBOs and textures

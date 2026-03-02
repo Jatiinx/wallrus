@@ -12,6 +12,8 @@ uniform float uBevelWidth;
 uniform float uLightAngle;
 uniform float uNoise;
 uniform float uDither;
+uniform float uDitherStrength;
+uniform float uDitherLevels;
 uniform float uVariation;
 
 vec2 swirlUV(vec2 uv) {
@@ -102,8 +104,7 @@ float bayer4x4(vec2 p) {
 
 vec3 applyDither(vec3 color, vec2 fragCoord) {
     if (uDither < 0.5) return color;
-    float levels = 4.0;
-    float threshold = bayer4x4(fragCoord) - 0.5;
-    float step_ = 1.0 / levels;
-    return floor(color / step_ + threshold + 0.5) * step_;
+    float threshold = (bayer4x4(fragCoord) - 0.5) * uDitherStrength;
+    float step_ = 1.0 / uDitherLevels;
+    return clamp(floor(color / step_ + threshold + 0.5) * step_, 0.0, 1.0);
 }

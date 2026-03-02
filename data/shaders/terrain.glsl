@@ -55,11 +55,5 @@ void main() {
     // Map to palette
     vec3 color = paletteColor(height);
     color = applyLighting(color, height, uv);
-
-    // Apply noise grain
-    float n = hash(gl_FragCoord.xy);
-    color += n * uNoise * 0.3;
-    color = clamp(color, 0.0, 1.0);
-    color = applyDither(color, gl_FragCoord.xy);
     fragColor = vec4(color, 1.0);
 }

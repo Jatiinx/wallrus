@@ -53,6 +53,11 @@ pub fn chromatic_fragment_source() -> String {
     include_str!("../data/shaders/chromatic.glsl").to_string()
 }
 
+/// Returns the effects (noise + dither) post-processing fragment shader source
+pub fn effects_fragment_source() -> String {
+    include_str!("../data/shaders/effects.glsl").to_string()
+}
+
 /// Which UI controls a preset uses
 pub struct PresetControls {
     pub has_angle: bool,

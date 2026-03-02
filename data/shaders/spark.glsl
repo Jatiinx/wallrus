@@ -44,11 +44,5 @@ void main() {
     color = 1.0 - exp(-color);
 
     color = applyLighting(color, palT, gl_FragCoord.xy / iResolution.xy);
-
-    // Apply noise grain
-    float n = hash(gl_FragCoord.xy);
-    color += n * uNoise * 0.3;
-    color = clamp(color, 0.0, 1.0);
-    color = applyDither(color, gl_FragCoord.xy);
     fragColor = vec4(color, 1.0);
 }

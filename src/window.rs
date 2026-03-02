@@ -524,14 +524,34 @@ impl WallrusWindow {
         noise_hint_row.set_activatable(false);
         noise_hint_row.set_selectable(false);
 
-        // --- Dither toggle ---
+        // --- Dither switch ---
+        let dither_row = adw::ActionRow::new();
+        dither_row.set_title("Dither");
         let dither_switch = gtk4::Switch::new();
-        dither_switch.set_active(false);
         dither_switch.set_valign(gtk4::Align::Center);
-
-        let dither_row = adw::ActionRow::builder().title("Dither").build();
         dither_row.add_suffix(&dither_switch);
-        dither_row.set_activatable_widget(Some(&dither_switch));
+
+        // --- Dither strength slider ---
+        let dither_strength_scale =
+            gtk4::Scale::with_range(gtk4::Orientation::Horizontal, 0.0, 1.0, 0.01);
+        dither_strength_scale.set_value(0.5);
+        dither_strength_scale.set_hexpand(true);
+        dither_strength_scale.set_draw_value(true);
+        dither_strength_scale.set_value_pos(gtk4::PositionType::Right);
+        let dither_strength_row = adw::ActionRow::builder().title("Strength").build();
+        dither_strength_row.add_suffix(&dither_strength_scale);
+        dither_strength_row.set_visible(false);
+
+        // --- Dither levels slider ---
+        let dither_levels_scale =
+            gtk4::Scale::with_range(gtk4::Orientation::Horizontal, 2.0, 8.0, 1.0);
+        dither_levels_scale.set_value(4.0);
+        dither_levels_scale.set_hexpand(true);
+        dither_levels_scale.set_draw_value(true);
+        dither_levels_scale.set_value_pos(gtk4::PositionType::Right);
+        let dither_levels_row = adw::ActionRow::builder().title("Color Levels").build();
+        dither_levels_row.add_suffix(&dither_levels_scale);
+        dither_levels_row.set_visible(false);
 
         let distortion_group = adw::PreferencesGroup::new();
         distortion_group.set_title("Distortion");
@@ -544,6 +564,8 @@ impl WallrusWindow {
         effects_group.add(&noise_row);
         effects_group.add(&noise_hint_row);
         effects_group.add(&dither_row);
+        effects_group.add(&dither_strength_row);
+        effects_group.add(&dither_levels_row);
 
         // =====================================================================
         // Lighting section
@@ -1438,6 +1460,14 @@ impl WallrusWindow {
                 if distort_type == 0 {
                     distort_strength_scale.set_value(0.0);
                 }
+                // Adjust slider range per distortion type
+                if distort_type == 3 {
+                    // Sine Wave: 0–5
+                    distort_strength_scale.set_range(0.0, 5.0);
+                } else {
+                    // Swirl / Fish Eye: -10–10
+                    distort_strength_scale.set_range(-10.0, 10.0);
+                }
                 distort_strength_hint_row.set_visible(distort_type == 1); // Swirl only
             });
         }
@@ -1478,12 +1508,37 @@ impl WallrusWindow {
             });
         }
 
-        // --- Dither change ---
+        // --- Dither enable change ---
         {
             let state = state.clone();
+            let dither_strength_row = dither_strength_row.clone();
+            let dither_levels_row = dither_levels_row.clone();
             dither_switch.connect_active_notify(move |switch| {
+                let active = switch.is_active();
+                dither_strength_row.set_visible(active);
+                dither_levels_row.set_visible(active);
                 if let Some(ref mut renderer) = *state.borrow_mut() {
-                    renderer.dither = if switch.is_active() { 1.0 } else { 0.0 };
+                    renderer.dither = if active { 1.0 } else { 0.0 };
+                }
+            });
+        }
+
+        // --- Dither strength change ---
+        {
+            let state = state.clone();
+            dither_strength_scale.connect_value_changed(move |scale| {
+                if let Some(ref mut renderer) = *state.borrow_mut() {
+                    renderer.dither_strength = scale.value() as f32;
+                }
+            });
+        }
+
+        // --- Dither levels change ---
+        {
+            let state = state.clone();
+            dither_levels_scale.connect_value_changed(move |scale| {
+                if let Some(ref mut renderer) = *state.borrow_mut() {
+                    renderer.dither_levels = scale.value() as f32;
                 }
             });
         }
@@ -1733,6 +1788,8 @@ impl WallrusWindow {
             let distort_strength_scale = distort_strength_scale.clone();
             let noise_scale = noise_scale.clone();
             let dither_switch = dither_switch.clone();
+            let dither_strength_scale = dither_strength_scale.clone();
+            let dither_levels_scale = dither_levels_scale.clone();
             let lighting_switch = lighting_switch.clone();
             let lighting_row = lighting_row.clone();
             let light_strength_scale = light_strength_scale.clone();
@@ -1852,7 +1909,11 @@ impl WallrusWindow {
                 // The distort_row handler takes care of visibility, but we
                 // need to set strength values after the type is set.
                 if rand_distort != 0 {
-                    let rand_distort_str: f64 = rng.gen_range(-10.0..10.0);
+                    let rand_distort_str: f64 = if rand_distort == 3 {
+                        rng.gen_range(0.0..5.0) // Sine Wave: 0–5
+                    } else {
+                        rng.gen_range(-10.0..10.0) // Swirl / Fish Eye
+                    };
                     distort_strength_scale.set_value(rand_distort_str);
                 }
 
@@ -1861,9 +1922,17 @@ impl WallrusWindow {
                 let rand_noise: f64 = rng.gen_range(-0.2..0.2);
                 noise_scale.set_value(rand_noise);
 
-                // Dither (coin flip)
-                let rand_dither: bool = rng.gen_bool(0.5);
-                dither_switch.set_active(rand_dither);
+                // Dither (50% chance on)
+                let rand_dither_on: bool = rng.gen_bool(0.5);
+                dither_switch.set_active(rand_dither_on);
+                if rand_dither_on {
+                    // Strength 0.2–0.8
+                    let rand_strength: f64 = rng.gen_range(0.2..0.8);
+                    dither_strength_scale.set_value(rand_strength);
+                    // Levels 2–8
+                    let rand_levels: f64 = rng.gen_range(2.0_f64..9.0).floor();
+                    dither_levels_scale.set_value(rand_levels);
+                }
 
                 // --- Lighting ---
                 let rand_lighting_on: bool = rng.gen_bool(0.5);
