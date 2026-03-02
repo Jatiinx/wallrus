@@ -8,7 +8,9 @@ const COMMON_GLSL: &str = include_str!("../data/shaders/common.glsl");
 
 /// Names of all available presets, in display order
 pub fn preset_names() -> &'static [&'static str] {
-    &["Bars", "Circle", "Plasma", "Waves", "Terrain", "Dunes"]
+    &[
+        "Bars", "Circle", "Plasma", "Waves", "Terrain", "Dunes", "Spark",
+    ]
 }
 
 /// Returns the shared vertex shader source (fullscreen quad passthrough)
@@ -30,6 +32,7 @@ pub fn fragment_source_for(name: &str) -> Option<String> {
         "Terrain" => include_str!("../data/shaders/terrain.glsl"),
         "Circle" => include_str!("../data/shaders/circle.glsl"),
         "Dunes" => include_str!("../data/shaders/dunes.glsl"),
+        "Spark" => include_str!("../data/shaders/spark.glsl"),
         _ => return None,
     };
     Some(assemble(src))
@@ -134,6 +137,17 @@ pub fn controls_for(name: &str) -> PresetControls {
             speed_range: (0.0, 20.0, 0.1, 0.0),
             scale_range: (0.1, 3.0, 0.1, 1.0),
             variation_range: (0.0, 20.0, 0.1, 0.0),
+        },
+        "Spark" => PresetControls {
+            has_angle: false,
+            has_scale: true,
+            has_speed: false,
+            has_center: false,
+            has_variation: false,
+            speed_label: "Time",
+            speed_range: (0.0, 20.0, 0.1, 0.0),
+            scale_range: (0.1, 5.0, 0.1, 1.0),
+            variation_range: (0.0, 1.0, 0.01, 0.0),
         },
         _ => PresetControls {
             has_angle: true,
