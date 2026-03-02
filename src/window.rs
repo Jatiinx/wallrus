@@ -440,7 +440,7 @@ impl WallrusWindow {
         // =====================================================================
 
         // --- Distortion type dropdown ---
-        let distort_list = gtk4::StringList::new(&["None", "Swirl", "Fish Eye"]);
+        let distort_list = gtk4::StringList::new(&["None", "Swirl", "Fish Eye", "Sine Wave"]);
         let distort_row = adw::ComboRow::new();
         distort_row.set_title("Type");
         distort_row.set_model(Some(&distort_list));
@@ -1426,7 +1426,7 @@ impl WallrusWindow {
             let distort_strength_hint_row = distort_strength_hint_row.clone();
             distort_row.connect_selected_notify(move |combo| {
                 let idx = combo.selected();
-                let distort_type = idx as i32; // 0=None, 1=Swirl, 2=Fish Eye
+                let distort_type = idx as i32; // 0=None, 1=Swirl, 2=Fish Eye, 3=Sine Wave
                 if let Some(ref mut renderer) = *state.borrow_mut() {
                     renderer.distort_type = distort_type;
                     if distort_type == 0 {
@@ -1846,8 +1846,8 @@ impl WallrusWindow {
                 }
 
                 // --- Distortion ---
-                // Pick a random distortion type (0=None, 1=Swirl, 2=Fish Eye)
-                let rand_distort: u32 = rng.gen_range(0..3);
+                // Pick a random distortion type (0=None, 1=Swirl, 2=Fish Eye, 3=Sine Wave)
+                let rand_distort: u32 = rng.gen_range(0..4);
                 distort_row.set_selected(rand_distort);
                 // The distort_row handler takes care of visibility, but we
                 // need to set strength values after the type is set.

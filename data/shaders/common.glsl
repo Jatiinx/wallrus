@@ -34,9 +34,18 @@ vec2 fisheyeUV(vec2 uv) {
     return offset + 0.5;
 }
 
+vec2 sineWaveUV(vec2 uv) {
+    float amp = uDistortStrength * 0.02;
+    float freq = 10.0;
+    uv.x += sin(uv.y * freq) * amp;
+    uv.y += sin(uv.x * freq) * amp;
+    return uv;
+}
+
 vec2 distortUV(vec2 uv) {
     if (uDistortType == 1) return swirlUV(uv);
     if (uDistortType == 2) return fisheyeUV(uv);
+    if (uDistortType == 3) return sineWaveUV(uv);
     return uv;
 }
 
