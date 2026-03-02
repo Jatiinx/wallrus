@@ -1,13 +1,10 @@
 /// Palette image handling — extract colors from 1x4 palette images
 /// and list available palette images organized by category (subfolder).
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use gtk4::glib;
 use image::{ImageBuffer, Rgb};
-
-/// The category name used for user-saved palettes.
-pub const CUSTOM_CATEGORY: &str = "Custom";
 
 /// A category name mapped to its palette image paths (sorted by filename).
 pub type PaletteCategories = BTreeMap<String, Vec<PathBuf>>;
@@ -47,18 +44,14 @@ pub fn extract_colors_from_image(path: &Path) -> Result<[[f32; 3]; 4], String> {
 
 /// List all palette images organized by category.
 ///
-/// Categories are subfolders inside the palette root directories.
+/// Categories are subfolders inside the user palettes directory.
+/// Bundled palettes are expected to have been copied there already by
+/// `sync_bundled_palettes()`.
 /// Images directly in the root (not in a subfolder) go into an "Uncategorized" category.
-/// Bundled and user-saved palettes are scanned and merged.
 /// Categories are sorted alphabetically; images within each are sorted by filename.
 pub fn list_palette_categories() -> PaletteCategories {
     let mut categories: PaletteCategories = BTreeMap::new();
 
-    if let Some(dir) = bundled_palettes_dir() {
-        collect_categorized_images(&dir, &mut categories);
-    }
-
-    // Scan user-saved palettes from the sandbox data directory
     let user_dir = user_palettes_dir();
     collect_categorized_images(&user_dir, &mut categories);
 
@@ -74,15 +67,119 @@ pub fn list_palette_categories() -> PaletteCategories {
     categories
 }
 
+/// Copy bundled palette images into the user-writable palettes directory.
+///
+/// On first run, all bundled palettes are copied. On subsequent runs, only
+/// newly added bundled palettes (e.g. from app updates) are copied. Palettes
+/// the user has deleted are tracked in a manifest file and will not be
+/// re-copied.
+///
+/// The manifest file (`.bundled_manifest`) lives in the user palettes directory
+/// and contains one relative path per line (e.g. `earth/ffaa00ff8800.png`)
+/// for every bundled palette that has been seen.
+pub fn sync_bundled_palettes() {
+    let bundled_dir = match bundled_palettes_dir() {
+        Some(d) => d,
+        None => return, // No bundled palettes found (shouldn't happen in practice)
+    };
+
+    let user_dir = user_palettes_dir();
+    let manifest_path = user_dir.join(".bundled_manifest");
+
+    // Load existing manifest entries
+    let mut manifest: BTreeSet<String> = match std::fs::read_to_string(&manifest_path) {
+        Ok(contents) => contents.lines().map(|l| l.to_string()).collect(),
+        Err(_) => BTreeSet::new(),
+    };
+
+    let mut manifest_changed = false;
+
+    // Walk bundled palettes: each subfolder is a category
+    let entries = match std::fs::read_dir(&bundled_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let category = match path.file_name().and_then(|n| n.to_str()) {
+            Some(name) => name.to_string(),
+            None => continue,
+        };
+
+        let sub_entries = match std::fs::read_dir(&path) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for sub_entry in sub_entries.flatten() {
+            let src = sub_entry.path();
+            if !src.is_file() || !is_image_file(&src) {
+                continue;
+            }
+
+            let filename = match src.file_name().and_then(|n| n.to_str()) {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+
+            let relative = format!("{}/{}", category, filename);
+
+            if manifest.contains(&relative) {
+                // Already copied (or was copied and then deleted by user) — skip
+                continue;
+            }
+
+            // Copy to user directory
+            let dest_dir = user_dir.join(&category);
+            if !dest_dir.exists() {
+                if let Err(e) = std::fs::create_dir_all(&dest_dir) {
+                    eprintln!(
+                        "Failed to create palette category dir '{}': {}",
+                        dest_dir.display(),
+                        e
+                    );
+                    continue;
+                }
+            }
+
+            let dest = dest_dir.join(&filename);
+            if let Err(e) = std::fs::copy(&src, &dest) {
+                eprintln!("Failed to copy bundled palette '{}': {}", relative, e);
+                continue;
+            }
+
+            manifest.insert(relative);
+            manifest_changed = true;
+        }
+    }
+
+    // Write updated manifest back to disk
+    if manifest_changed {
+        let contents: String = manifest
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if let Err(e) = std::fs::write(&manifest_path, contents) {
+            eprintln!("Failed to write bundled manifest: {}", e);
+        }
+    }
+}
+
 /// Save 4 colors as a 1x4px palette PNG in the user data directory.
 ///
-/// The image is saved under the "Custom" subfolder with a timestamp-based name.
-/// Returns the path of the saved file.
-pub fn save_palette_image(colors: &[[f32; 3]; 4]) -> Result<PathBuf, String> {
-    let custom_dir = user_palettes_dir().join(CUSTOM_CATEGORY.to_lowercase());
-    if !custom_dir.exists() {
-        std::fs::create_dir_all(&custom_dir)
-            .map_err(|e| format!("Failed to create custom palettes dir: {}", e))?;
+/// The image is saved under the given `category` subfolder (lowercased) with
+/// a timestamp-based name. Returns the path of the saved file.
+pub fn save_palette_image(colors: &[[f32; 3]; 4], category: &str) -> Result<PathBuf, String> {
+    let cat_dir = user_palettes_dir().join(category.to_lowercase());
+    if !cat_dir.exists() {
+        std::fs::create_dir_all(&cat_dir)
+            .map_err(|e| format!("Failed to create palettes dir: {}", e))?;
     }
 
     let timestamp = std::time::SystemTime::now()
@@ -90,7 +187,7 @@ pub fn save_palette_image(colors: &[[f32; 3]; 4]) -> Result<PathBuf, String> {
         .unwrap_or_default()
         .as_secs();
     let filename = format!("palette_{}.png", timestamp);
-    let path = custom_dir.join(&filename);
+    let path = cat_dir.join(&filename);
 
     let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(1, 4);
     for (i, color) in colors.iter().enumerate() {
@@ -106,9 +203,11 @@ pub fn save_palette_image(colors: &[[f32; 3]; 4]) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Delete a user-saved palette image.
+/// Delete a palette image.
 ///
-/// Only allows deletion of files inside the user palettes directory (safety check).
+/// All palettes live in the user-writable directory (bundled palettes are
+/// copied there by `sync_bundled_palettes()`), so the safety check simply
+/// ensures the path is inside that directory.
 pub fn delete_palette_image(path: &Path) -> Result<(), String> {
     let user_dir = user_palettes_dir();
     if !path.starts_with(&user_dir) {
@@ -118,17 +217,12 @@ pub fn delete_palette_image(path: &Path) -> Result<(), String> {
     std::fs::remove_file(path).map_err(|e| format!("Failed to delete palette: {}", e))
 }
 
-/// Whether the given category name is the user-saved custom category.
-pub fn is_custom_category(name: &str) -> bool {
-    name == CUSTOM_CATEGORY
-}
-
 /// Get the user palettes directory inside the sandbox data dir.
 ///
 /// In Flatpak this is `~/.var/app/io.github.megakode.Wallrus/data/palettes/`.
 /// Outside Flatpak this is `~/.local/share/palettes/` (via `g_get_user_data_dir()`).
 /// Creates the directory if it doesn't exist.
-fn user_palettes_dir() -> PathBuf {
+pub fn user_palettes_dir() -> PathBuf {
     let dir = glib::user_data_dir().join("palettes");
     if !dir.exists() {
         let _ = std::fs::create_dir_all(&dir);

@@ -29,6 +29,7 @@ impl WallrusWindow {
 
         // Hamburger menu with About item
         let menu = gio::Menu::new();
+        menu.append(Some("Open Palette Directory"), Some("win.open-palette-dir"));
         menu.append(Some("About Wallrus"), Some("win.show-about"));
         let menu_button = gtk4::MenuButton::new();
         menu_button.set_icon_name("open-menu-symbolic");
@@ -61,7 +62,8 @@ impl WallrusWindow {
         // Palette section — category dropdown + FlowBox thumbnail browser
         // =====================================================================
 
-        // Load all categories at startup
+        // Load all categories at startup (sync bundled palettes to user dir first)
+        palette::sync_bundled_palettes();
         let all_categories: Rc<RefCell<palette::PaletteCategories>> =
             Rc::new(RefCell::new(palette::list_palette_categories()));
         let category_names: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(
@@ -108,13 +110,18 @@ impl WallrusWindow {
         palette_scroll.set_policy(gtk4::PolicyType::Never, gtk4::PolicyType::Automatic);
 
         // --- Helper: populate FlowBox with images from a category ---
-        // When `is_custom` is true, a delete button overlay is shown on each thumbnail.
-        // `on_delete` is called after a palette is deleted to refresh the view.
+        // A delete button overlay is shown on each thumbnail.
+        // After deletion, the shared `refresh_current_category` callback is
+        // invoked to reload categories from disk and repopulate the view.
+        let refresh_current_category: Rc<RefCell<Option<Rc<dyn Fn()>>>> =
+            Rc::new(RefCell::new(None));
+
         let populate_flowbox = {
             let flowbox = palette_flowbox.clone();
             let paths = palette_paths.clone();
             let smooth = smooth_gradient.clone();
-            Rc::new(move |images: &[PathBuf], is_custom: bool, on_delete: Option<Rc<dyn Fn()>>| {
+            let refresh = refresh_current_category.clone();
+            Rc::new(move |images: &[PathBuf]| {
                 // Clear existing children
                 while let Some(child) = flowbox.first_child() {
                     flowbox.remove(&child);
@@ -122,12 +129,7 @@ impl WallrusWindow {
                 paths.borrow_mut().clear();
 
                 if images.is_empty() {
-                    let msg = if is_custom {
-                        "No saved palettes yet."
-                    } else {
-                        "No palettes in this category."
-                    };
-                    let label = gtk4::Label::new(Some(msg));
+                    let label = gtk4::Label::new(Some("No palettes in this category."));
                     label.set_wrap(true);
                     label.set_justify(gtk4::Justification::Center);
                     label.add_css_class("dim-label");
@@ -159,48 +161,73 @@ impl WallrusWindow {
                             image.set_size_request(80, 80);
                             image.set_content_fit(gtk4::ContentFit::Cover);
 
-                            if is_custom {
-                                // Wrap in overlay with delete button
-                                let overlay = gtk4::Overlay::new();
-                                overlay.set_child(Some(&image));
+                            // Wrap in overlay with delete button
+                            let overlay = gtk4::Overlay::new();
+                            overlay.set_child(Some(&image));
 
-                                let delete_btn = gtk4::Button::from_icon_name("window-close-symbolic");
-                                delete_btn.add_css_class("circular");
-                                delete_btn.add_css_class("osd");
-                                delete_btn.set_halign(gtk4::Align::End);
-                                delete_btn.set_valign(gtk4::Align::Start);
-                                delete_btn.set_margin_top(2);
-                                delete_btn.set_margin_end(2);
-                                delete_btn.set_tooltip_text(Some("Delete palette"));
+                            let delete_btn = gtk4::Button::from_icon_name("window-close-symbolic");
+                            delete_btn.add_css_class("circular");
+                            delete_btn.add_css_class("osd");
+                            delete_btn.set_halign(gtk4::Align::End);
+                            delete_btn.set_valign(gtk4::Align::Start);
+                            delete_btn.set_margin_top(2);
+                            delete_btn.set_margin_end(2);
+                            delete_btn.set_tooltip_text(Some("Delete palette"));
+                            delete_btn.set_visible(false);
 
-                                let path_clone = path.clone();
-                                let on_delete_clone = on_delete.clone();
-                                delete_btn.connect_clicked(move |btn| {
-                                    let win = btn.root().and_then(|r| r.downcast::<adw::ApplicationWindow>().ok());
-                                    match palette::delete_palette_image(&path_clone) {
+                            // Show/hide delete button on hover
+                            let hover_ctl = gtk4::EventControllerMotion::new();
+                            let btn_enter = delete_btn.clone();
+                            hover_ctl.connect_enter(move |_, _, _| {
+                                btn_enter.set_visible(true);
+                            });
+                            let btn_leave = delete_btn.clone();
+                            hover_ctl.connect_leave(move |_| {
+                                btn_leave.set_visible(false);
+                            });
+                            overlay.add_controller(hover_ctl);
+
+                            let path_clone = path.clone();
+                            let refresh_clone = refresh.clone();
+                            delete_btn.connect_clicked(move |btn| {
+                                let win = btn.root().and_then(|r| r.downcast::<adw::ApplicationWindow>().ok());
+                                let Some(ref w) = win else { return };
+
+                                let dialog = adw::MessageDialog::new(
+                                    Some(w),
+                                    Some("Delete Palette?"),
+                                    Some("This palette will be permanently removed."),
+                                );
+                                dialog.add_responses(&[("cancel", "Cancel"), ("delete", "Delete")]);
+                                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+                                dialog.set_default_response(Some("cancel"));
+                                dialog.set_close_response("cancel");
+
+                                let path_for_dialog = path_clone.clone();
+                                let refresh_for_dialog = refresh_clone.clone();
+                                let win_for_dialog = w.clone();
+                                dialog.connect_response(None, move |_, response| {
+                                    if response != "delete" {
+                                        return;
+                                    }
+                                    match palette::delete_palette_image(&path_for_dialog) {
                                         Ok(()) => {
-                                            if let Some(ref w) = win {
-                                                show_toast(w, "Palette deleted");
-                                            }
-                                            if let Some(ref cb) = on_delete_clone {
+                                            show_toast(&win_for_dialog, "Palette deleted");
+                                            if let Some(ref cb) = *refresh_for_dialog.borrow() {
                                                 cb();
                                             }
                                         }
                                         Err(e) => {
-                                            if let Some(ref w) = win {
-                                                show_toast(w, &format!("Failed to delete: {}", e));
-                                            } else {
-                                                eprintln!("Failed to delete palette: {}", e);
-                                            }
+                                            show_toast(&win_for_dialog, &format!("Failed to delete: {}", e));
                                         }
                                     }
                                 });
 
-                                overlay.add_overlay(&delete_btn);
-                                flowbox.insert(&overlay, -1);
-                            } else {
-                                flowbox.insert(&image, -1);
-                            }
+                                dialog.present();
+                            });
+
+                            overlay.add_overlay(&delete_btn);
+                            flowbox.insert(&overlay, -1);
                             paths.borrow_mut().push(path.clone());
                         }
                         Err(e) => {
@@ -231,8 +258,7 @@ impl WallrusWindow {
             let names = category_names.borrow();
             let cats = all_categories.borrow();
             if let Some(images) = cats.get(&names[0]) {
-                let is_custom = palette::is_custom_category(&names[0]);
-                populate_flowbox(images, is_custom, None);
+                populate_flowbox(images);
             }
         }
 
@@ -1058,16 +1084,12 @@ impl WallrusWindow {
         // --- Category dropdown: repopulate FlowBox when category changes ---
         // Also used by save/delete to refresh the current view.
 
-        // Shared refresh: reloads categories from disk and repopulates the current view.
-        let refresh_current_category: Rc<RefCell<Option<Rc<dyn Fn()>>>> =
-            Rc::new(RefCell::new(None));
-
+        // Wire up the shared refresh callback (declared before populate_flowbox).
         {
             let all_cats = all_categories.clone();
             let cat_names = category_names.clone();
             let populate = populate_flowbox.clone();
             let category_row_ref = category_row.clone();
-            let refresh_ref = refresh_current_category.clone();
 
             let do_refresh: Rc<dyn Fn()> = Rc::new(move || {
                 // Reload from disk
@@ -1096,8 +1118,7 @@ impl WallrusWindow {
                     // Repopulate flowbox for the selected category
                     let cats = all_cats.borrow();
                     if let Some(images) = cats.get(&new_names[new_idx]) {
-                        let is_custom = palette::is_custom_category(&new_names[new_idx]);
-                        populate(images, is_custom, Some(refresh_ref.borrow().as_ref().unwrap().clone()));
+                        populate(images);
                     }
                     // Set selected after populating to avoid double-trigger
                     category_row_ref.set_selected(new_idx as u32);
@@ -1110,20 +1131,13 @@ impl WallrusWindow {
             let all_cats2 = all_categories.clone();
             let cat_names2 = category_names.clone();
             let populate2 = populate_flowbox.clone();
-            let refresh_for_delete = refresh_current_category.clone();
             category_row.connect_selected_notify(move |combo| {
                 let idx = combo.selected() as usize;
                 let names = cat_names2.borrow();
                 if let Some(name) = names.get(idx) {
                     let cats = all_cats2.borrow();
                     if let Some(images) = cats.get(name) {
-                        let is_custom = palette::is_custom_category(name);
-                        let on_delete = if is_custom {
-                            Some(refresh_for_delete.borrow().as_ref().unwrap().clone())
-                        } else {
-                            None
-                        };
-                        populate2(images, is_custom, on_delete);
+                        populate2(images);
                     }
                 }
             });
@@ -1134,7 +1148,6 @@ impl WallrusWindow {
             let populate3 = populate_flowbox.clone();
             let smooth_state = smooth_gradient.clone();
             let category_row_ref2 = category_row.clone();
-            let refresh_for_smooth = refresh_current_category.clone();
             smooth_switch.connect_active_notify(move |switch| {
                 smooth_state.set(switch.is_active());
                 let idx = category_row_ref2.selected() as usize;
@@ -1142,13 +1155,7 @@ impl WallrusWindow {
                 if let Some(name) = names.get(idx) {
                     let cats = all_cats3.borrow();
                     if let Some(images) = cats.get(name) {
-                        let is_custom = palette::is_custom_category(name);
-                        let on_delete = if is_custom {
-                            Some(refresh_for_smooth.borrow().as_ref().unwrap().clone())
-                        } else {
-                            None
-                        };
-                        populate3(images, is_custom, on_delete);
+                        populate3(images);
                     }
                 }
             });
@@ -1181,16 +1188,18 @@ impl WallrusWindow {
                     },
                 ];
 
-                match palette::save_palette_image(&colors) {
+                // Save into the currently selected category
+                let category = {
+                    let idx = category_row_ref.selected() as usize;
+                    let names = cat_names_ref.borrow();
+                    names.get(idx).cloned().unwrap_or_else(|| "Custom".to_string())
+                };
+
+                match palette::save_palette_image(&colors, &category) {
                     Ok(_) => {
-                        // Refresh categories and switch to Custom
+                        // Refresh categories to show the new palette
                         if let Some(ref cb) = *refresh.borrow() {
                             cb();
-                        }
-                        // Switch to Custom category
-                        let names = cat_names_ref.borrow();
-                        if let Some(idx) = names.iter().position(|n| palette::is_custom_category(n)) {
-                            category_row_ref.set_selected(idx as u32);
                         }
                         show_toast(&window_ref, "Palette saved");
                     }
@@ -2191,6 +2200,21 @@ impl WallrusWindow {
             });
         }
         window.add_action(&action_about);
+
+        // --- Open palette directory action ---
+        let action_open_palette_dir = gio::SimpleAction::new("open-palette-dir", None);
+        {
+            action_open_palette_dir.connect_activate(move |_, _| {
+                let dir = palette::user_palettes_dir();
+                if let Err(e) = std::process::Command::new("xdg-open")
+                    .arg(&dir)
+                    .spawn()
+                {
+                    eprintln!("Failed to open palette directory: {}", e);
+                }
+            });
+        }
+        window.add_action(&action_open_palette_dir);
 
         window
     }
