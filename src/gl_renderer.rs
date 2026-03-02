@@ -81,6 +81,7 @@ pub struct RendererState {
     pub noise: f32,
     pub center: f32,
     pub dither: f32,
+    pub variation: f32,
     // Shader uniforms — lighting
     pub lighting_type: i32,
     pub light_strength: f32,
@@ -231,6 +232,7 @@ impl RendererState {
             noise: 0.0,
             center: 0.0,
             dither: 0.0,
+            variation: 0.0,
             lighting_type: 0,
             light_strength: 0.0,
             bevel_width: 0.05,
@@ -363,6 +365,9 @@ impl RendererState {
                 }
                 if let Some(loc) = gl.get_uniform_location(program.id, "uDither") {
                     gl.uniform_1_f32(Some(&loc), self.dither);
+                }
+                if let Some(loc) = gl.get_uniform_location(program.id, "uVariation") {
+                    gl.uniform_1_f32(Some(&loc), self.variation);
                 }
                 if let Some(loc) = gl.get_uniform_location(program.id, "uLightingType") {
                     gl.uniform_1_i32(Some(&loc), self.lighting_type);

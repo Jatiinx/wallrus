@@ -12,6 +12,7 @@ uniform float uBevelWidth;
 uniform float uLightAngle;
 uniform float uNoise;
 uniform float uDither;
+uniform float uVariation;
 
 vec2 swirlUV(vec2 uv) {
     vec2 c = uv - 0.5;

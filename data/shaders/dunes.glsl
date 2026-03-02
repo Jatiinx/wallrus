@@ -8,9 +8,16 @@ uniform float uSpeed;
 
 // common.glsl inserted here
 
-// Compute sine wave y-position for a dune layer
-float duneWave(float x, float baseY, float freq, float phase, float amplitude) {
-    return baseY + sin(x * freq + phase) * amplitude;
+// 1D hash for generating pseudo-random per-layer values from variation seed
+float hash1(float n) {
+    return fract(sin(n) * 43758.5453123);
+}
+
+// Compute sine wave y-position for a dune layer.
+// Includes a long-wavelength LFO that slowly modulates the wave shape.
+float duneWave(float x, float baseY, float freq, float phase, float amplitude, float lfoFreq) {
+    float lfo = sin(x * lfoFreq + phase * 0.7) * amplitude * 1.6;
+    return baseY + sin(x * freq + phase) * amplitude + lfo;
 }
 
 out vec4 fragColor;
@@ -21,54 +28,62 @@ void main() {
     float x = uv.x * uScale * 10.0 + uSpeed;
     float y = uv.y;
 
-    // Stack of dune silhouettes, same frequency but phase-offset from each other
-    float freq = 1.5;
+    // Use variation as a seed to generate random per-layer parameters.
+    // floor() so each integer step gives a new random set; fract part
+    // is unused so the slider "clicks" between distinct configurations.
+    float seed = floor(uVariation * 10.0) * 0.1;
 
-    // Compute wave positions (top to bottom)
-    float w0 = duneWave(x, 0.20, freq, 0.0,  0.07);
-    float w1 = duneWave(x, 0.40, freq, 2.5,  0.08);
-    float w2 = duneWave(x, 0.60, freq, 5.3,  0.07);
-    float w3 = duneWave(x, 0.80, freq, 8.7,  0.075);
+    // Per-layer random frequencies (range ~1.0 to 3.0)
+    float freq0 = 1.0 + hash1(seed + 0.1) * 2.0;
+    float freq1 = 1.0 + hash1(seed + 0.2) * 2.0;
+    float freq2 = 1.0 + hash1(seed + 0.3) * 2.0;
+
+    // Per-layer random phases (range 0 to 2*PI)
+    float p0 = hash1(seed + 0.4) * 6.2832;
+    float p1 = hash1(seed + 0.5) * 6.2832;
+    float p2 = hash1(seed + 0.6) * 6.2832;
+
+    // Per-layer random LFO frequencies (~1/6th to 1/3rd of main freq)
+    float lfo0 = freq0 * (0.15 + hash1(seed + 0.7) * 0.2);
+    float lfo1 = freq1 * (0.15 + hash1(seed + 0.8) * 0.2);
+    float lfo2 = freq2 * (0.15 + hash1(seed + 0.9) * 0.2);
+
+    // 3 dune waves: color1 is background, colors 2-4 are the dune layers
+    float w0 = duneWave(x, 0.30, freq0, p0, 0.07, lfo0);
+    float w1 = duneWave(x, 0.55, freq1, p1, 0.08, lfo1);
+    float w2 = duneWave(x, 0.80, freq2, p2, 0.07, lfo2);
 
     // Thin edge to preserve sine shape faithfully
     float edge = 0.005;
 
-    // Silhouette masks: 1.0 below wave, 0.0 above
+    // Silhouette masks: 1.0 when y < wave (pixel below wave on screen)
     float below0 = smoothstep(w0 + edge, w0 - edge, y);
     float below1 = smoothstep(w1 + edge, w1 - edge, y);
     float below2 = smoothstep(w2 + edge, w2 - edge, y);
-    float below3 = smoothstep(w3 + edge, w3 - edge, y);
 
-    // Determine which band the pixel is in and compute a smooth t.
-    //
-    // UV y=0 is bottom, y=1 is top. w3 (baseY=0.80) is the highest wave,
-    // w0 (baseY=0.20) is the lowest. belowN=1 means y < wN (pixel is
-    // geometrically below wave N on screen).
-    //
-    // Check from highest wave down. If not below w3, pixel is in the sky
-    // above all dunes. If below w3 but not w2, pixel is in the top band, etc.
+    // Determine which band the pixel is in.
+    // Color 1 (t<0.25) = background/sky above all waves
+    // Color 2 (t~0.25-0.50) = top dune (between w2 and w1)
+    // Color 3 (t~0.50-0.75) = middle dune (between w1 and w0)
+    // Color 4 (t~0.75-1.0)  = bottom/foreground dune (below w0)
     float t;
-    if (below3 < 0.5) {
-        // Above all waves: sky
-        t = 0.0;
-    } else if (below2 < 0.5) {
-        // Between wave 3 (top) and wave 2
-        float localT = (w3 - y) / max(w3 - w2, 0.001);
-        localT = clamp(localT, 0.0, 1.0);
+    if (below2 < 0.5) {
+        // Fade from background (color 1) to top dune (color 2) as y approaches w2 from above
+        float localT = smoothstep(w2 + 0.30, w2, y);
         t = mix(0.0, 0.25, localT);
     } else if (below1 < 0.5) {
-        // Between wave 2 and wave 1
+        // Between wave 2 (top) and wave 1: color 2
         float localT = (w2 - y) / max(w2 - w1, 0.001);
         localT = clamp(localT, 0.0, 1.0);
         t = mix(0.25, 0.50, localT);
     } else if (below0 < 0.5) {
-        // Between wave 1 and wave 0
+        // Between wave 1 and wave 0: color 3
         float localT = (w1 - y) / max(w1 - w0, 0.001);
         localT = clamp(localT, 0.0, 1.0);
         t = mix(0.50, 0.75, localT);
     } else {
-        // Below wave 0: foreground band (bottom of screen)
-        float localT = smoothstep(w0, w0 - 0.20, y);
+        // Below wave 0: foreground (color 4)
+        float localT = smoothstep(w0, w0 - 0.30, y);
         t = mix(0.75, 1.0, localT);
     }
 

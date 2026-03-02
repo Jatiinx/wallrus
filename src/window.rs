@@ -411,6 +411,17 @@ impl WallrusWindow {
         center_hint_row.set_activatable(false);
         center_hint_row.set_selectable(false);
 
+        // --- Variation slider ---
+        let variation_scale =
+            gtk4::Scale::with_range(gtk4::Orientation::Horizontal, 0.0, 20.0, 0.1);
+        variation_scale.set_value(0.0);
+        variation_scale.set_hexpand(true);
+        variation_scale.set_draw_value(true);
+        variation_scale.set_value_pos(gtk4::PositionType::Right);
+
+        let variation_row = adw::ActionRow::builder().title("Variation").build();
+        variation_row.add_suffix(&variation_scale);
+
         // --- Controls group ---
         let controls_group = adw::PreferencesGroup::new();
         controls_group.set_title("Pattern");
@@ -422,6 +433,7 @@ impl WallrusWindow {
         controls_group.add(&blend_hint_row);
         controls_group.add(&center_row);
         controls_group.add(&center_hint_row);
+        controls_group.add(&variation_row);
 
         // =====================================================================
         // Effects section — fullscreen effects applied to all shaders
@@ -1285,6 +1297,8 @@ impl WallrusWindow {
             let center_row = center_row.clone();
             let center_hint_row = center_hint_row.clone();
             let center_scale = center_scale.clone();
+            let variation_row = variation_row.clone();
+            let variation_scale = variation_scale.clone();
             move |name: &str| {
                 let controls = shader_presets::controls_for(name);
                 angle_row.set_visible(controls.has_angle);
@@ -1292,6 +1306,7 @@ impl WallrusWindow {
                 speed_row.set_visible(controls.has_speed);
                 center_row.set_visible(controls.has_center);
                 center_hint_row.set_visible(controls.has_center);
+                variation_row.set_visible(controls.has_variation);
                 // Reset center slider to default when switching presets
                 center_scale.set_value(0.0);
                 // Update scale slider range per preset
@@ -1305,6 +1320,11 @@ impl WallrusWindow {
                 speed_scale.set_range(min, max);
                 speed_scale.set_increments(step, step * 10.0);
                 speed_scale.set_value(default);
+                // Update variation slider range per preset
+                let (vmin, vmax, vstep, vdefault) = controls.variation_range;
+                variation_scale.set_range(vmin, vmax);
+                variation_scale.set_increments(vstep, vstep * 10.0);
+                variation_scale.set_value(vdefault);
             }
         };
 
@@ -1385,6 +1405,16 @@ impl WallrusWindow {
             let center_scale = center_scale.clone();
             center_reset.connect_clicked(move |_| {
                 center_scale.set_value(0.0);
+            });
+        }
+
+        // --- Variation change ---
+        {
+            let state = state.clone();
+            variation_scale.connect_value_changed(move |scale| {
+                if let Some(ref mut renderer) = *state.borrow_mut() {
+                    renderer.variation = scale.value() as f32;
+                }
             });
         }
 
@@ -1717,6 +1747,7 @@ impl WallrusWindow {
             let chromatic_switch = chromatic_switch.clone();
             let chromatic_strength_scale = chromatic_strength_scale.clone();
             let chromatic_angle_scale = chromatic_angle_scale.clone();
+            let variation_scale = variation_scale.clone();
             randomize_button.connect_clicked(move |_btn| {
                 let mut rng = rand::thread_rng();
 
@@ -1806,6 +1837,13 @@ impl WallrusWindow {
                 // Center (-1.0 to 1.0)
                 let rand_center: f64 = rng.gen_range(-1.0..1.0);
                 center_scale.set_value(rand_center);
+
+                // Variation (use the preset-specific range)
+                if controls.has_variation {
+                    let (vmin, vmax, _, _) = controls.variation_range;
+                    let rand_variation: f64 = rng.gen_range(vmin..vmax);
+                    variation_scale.set_value(rand_variation);
+                }
 
                 // --- Distortion ---
                 // Pick a random distortion type (0=None, 1=Swirl, 2=Fish Eye)
