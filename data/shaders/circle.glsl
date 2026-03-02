@@ -19,8 +19,12 @@ void main() {
     // Distance from offset center
     float d = length(uv - center);
 
-    // Map distance to 0-1 across the visible radius, scaled
-    float t = clamp(d * uScale, 0.0, 1.0);
+    // Map distance to palette range, scaled
+    float d_scaled = d * uScale * 2.0;
+
+    // Ping-pong: 1,2,3,4,3,2,1,2,3,4,...
+    // Triangle wave maps d_scaled into repeating 0→1→0 pattern
+    float t = 1.0 - abs(fract(d_scaled * 0.5) * 2.0 - 1.0);
 
     vec3 color = paletteColor(t);
     color = applyLighting(color, t, uv);
